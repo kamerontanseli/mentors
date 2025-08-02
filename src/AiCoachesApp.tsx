@@ -101,160 +101,161 @@ const AiCoachesApp = () => {
 
       const coachesToQuery = selectedCoaches.length ? selectedCoaches : coaches;
 
-      for (let i = 0; i < coachesToQuery.length; i++) {
-        const coach = coachesToQuery[i];
-        const thinkingId = Number(`${Date.now()}${i + 1}`);
-        const thinking: MessageType = {
-          id: thinkingId,
-          type: "coach",
-          coach: coach.name,
-          emoji: coach.emoji,
-          content: "💭 Thinking...",
-          timestamp: new Date(),
-          isStreaming: true,
-        };
-        setChatMessages((prev) => [...prev, thinking]);
-
-        try {
-          const baseMessages: {
-            role: "system" | "user" | "assistant";
-            content: string;
-          }[] = [{ role: "system", content: coach.systemPrompt }];
-          if (useReasoning && currentModel && !currentModel.nativeReasoning) {
-            baseMessages.push({
-              role: "system",
-              content:
-                "Think step by step and reason through your response carefully. Consider multiple angles and show your thought process before giving your final answer.",
-            });
-          }
-          baseMessages.push({
-            role: "user",
-            content: `Previous conversation context:\n${history
-              .slice(-6)
-              .map((msg) => `${msg.role}: ${msg.content}`)
-              .join(
-                "\n",
-              )}\n\nCurrent question: "${asked}"\n\nRespond as ${coach.name} would, keeping your response ${
-              useReasoning
-                ? "detailed and thoughtful"
-                : "concise but valuable (2-3 sentences max)"
-            }. Focus on your unique expertise and perspective. You can use markdown formatting (headers, bold, italic, lists, code blocks, etc.) in your response to make it more readable.`,
-          });
-
-          interface ChatMessage {
-            role: "system" | "user" | "assistant";
-            content: string;
-          }
-          const body: {
-            model: string;
-            messages: ChatMessage[];
-            max_tokens: number;
-            temperature?: number;
-            stream: true;
-          } = {
-            model: selectedModel,
-            messages: baseMessages,
-            max_tokens: useReasoning ? 800 : 300,
-            temperature: 0.7,
-            stream: true,
+      await Promise.all(
+        coachesToQuery.map(async (coach, i) => {
+          const thinkingId = Number(`${Date.now()}${i + 1}`);
+          const thinking: MessageType = {
+            id: thinkingId,
+            type: "coach",
+            coach: coach.name,
+            emoji: coach.emoji,
+            content: "💭 Thinking...",
+            timestamp: new Date(),
+            isStreaming: true,
           };
+          setChatMessages((prev) => [...prev, thinking]);
 
-          if (currentModel && currentModel.nativeReasoning) {
-            body.messages = baseMessages.filter((m) => m.role !== "system");
-            body.messages[0] = {
+          try {
+            const baseMessages: {
+              role: "system" | "user" | "assistant";
+              content: string;
+            }[] = [{ role: "system", content: coach.systemPrompt }];
+            if (useReasoning && currentModel && !currentModel.nativeReasoning) {
+              baseMessages.push({
+                role: "system",
+                content:
+                  "Think step by step and reason through your response carefully. Consider multiple angles and show your thought process before giving your final answer.",
+              });
+            }
+            baseMessages.push({
               role: "user",
-              content: `${coach.systemPrompt}\n\n${body.messages[0].content}`,
+              content: `Previous conversation context:\n${history
+                .slice(-6)
+                .map((msg) => `${msg.role}: ${msg.content}`)
+                .join(
+                  "\n",
+                )}\n\nCurrent question: "${asked}"\n\nRespond as ${coach.name} would, keeping your response ${
+                useReasoning
+                  ? "detailed and thoughtful"
+                  : "concise but valuable (2-3 sentences max)"
+              }. Focus on your unique expertise and perspective. You can use markdown formatting (headers, bold, italic, lists, code blocks, etc.) in your response to make it more readable.`,
+            });
+
+            interface ChatMessage {
+              role: "system" | "user" | "assistant";
+              content: string;
+            }
+            const body: {
+              model: string;
+              messages: ChatMessage[];
+              max_tokens: number;
+              temperature?: number;
+              stream: true;
+            } = {
+              model: selectedModel,
+              messages: baseMessages,
+              max_tokens: useReasoning ? 800 : 300,
+              temperature: 0.7,
+              stream: true,
             };
-            delete body.temperature;
-          }
 
-          const response = await fetch(
-            "https://openrouter.ai/api/v1/chat/completions",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${apiKey}`,
-                "Content-Type": "application/json",
-                "HTTP-Referer": window.location.origin,
-                "X-Title": "AI Coaches App",
+            if (currentModel && currentModel.nativeReasoning) {
+              body.messages = baseMessages.filter((m) => m.role !== "system");
+              body.messages[0] = {
+                role: "user",
+                content: `${coach.systemPrompt}\n\n${body.messages[0].content}`,
+              };
+              delete body.temperature;
+            }
+
+            const response = await fetch(
+              "https://openrouter.ai/api/v1/chat/completions",
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${apiKey}`,
+                  "Content-Type": "application/json",
+                  "HTTP-Referer": window.location.origin,
+                  "X-Title": "AI Coaches App",
+                },
+                body: JSON.stringify(body),
               },
-              body: JSON.stringify(body),
-            },
-          );
-
-          if (!response.ok || !response.body) {
-            const errorData: { error?: { message?: string } } = await response
-              .json()
-              .catch(() => ({}) as { error?: { message?: string } });
-            throw new Error(
-              errorData.error?.message || `HTTP ${response.status}`,
             );
-          }
 
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let acc = "";
-          const messageId = thinking.id;
+            if (!response.ok || !response.body) {
+              const errorData: { error?: { message?: string } } = await response
+                .json()
+                .catch(() => ({}) as { error?: { message?: string } });
+              throw new Error(
+                errorData.error?.message || `HTTP ${response.status}`,
+              );
+            }
 
-          setChatMessages((prev) =>
-            prev.map((m) =>
-              m.id === messageId ? { ...m, content: "", isStreaming: true } : m,
-            ),
-          );
-          const cancelled = false;
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let acc = "";
+            const messageId = thinking.id;
 
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done || cancelled) break;
-            const chunk = decoder.decode(value);
-            const lines = chunk.split("\n").filter((l) => l.trim());
-            for (const line of lines) {
-              if (line.startsWith("data: ")) {
-                const data = line.slice(6);
-                if (data === "[DONE]") continue;
-                try {
-                  const parsed = JSON.parse(data);
-                  const content = parsed.choices?.[0]?.delta?.content || "";
-                  if (content) {
-                    acc += content;
-                    setChatMessages((prev) =>
-                      prev.map((m) =>
-                        m.id === messageId && m.type === "coach"
-                          ? { ...m, content: acc, isStreaming: true }
-                          : m,
-                      ),
-                    );
+            setChatMessages((prev) =>
+              prev.map((m) =>
+                m.id === messageId ? { ...m, content: "", isStreaming: true } : m,
+              ),
+            );
+            const cancelled = false;
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done || cancelled) break;
+              const chunk = decoder.decode(value);
+              const lines = chunk.split("\n").filter((l) => l.trim());
+              for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                  const data = line.slice(6);
+                  if (data === "[DONE]") continue;
+                  try {
+                    const parsed = JSON.parse(data);
+                    const content = parsed.choices?.[0]?.delta?.content || "";
+                    if (content) {
+                      acc += content;
+                      setChatMessages((prev) =>
+                        prev.map((m) =>
+                          m.id === messageId && m.type === "coach"
+                            ? { ...m, content: acc, isStreaming: true }
+                            : m,
+                        ),
+                      );
+                    }
+                  } catch (err) {
+                    console.error(err);
                   }
-                } catch (err) {
-                  console.error(err);
                 }
               }
             }
-          }
 
-          setChatMessages((prev) =>
-            prev.map((m) =>
-              m.id === messageId && m.type === "coach"
-                ? { ...m, isStreaming: false }
-                : m,
-            ),
-          );
-        } catch (coachErr: unknown) {
-          const messageId = thinking.id;
-          setChatMessages((prev) =>
-            prev.map((m) =>
-              m.id === messageId && m.type === "coach"
-                ? {
-                    ...m,
-                    content: `❌ Error: ${coachErr instanceof Error ? coachErr.message : "Failed to get response"}`,
-                    isStreaming: false,
-                    isError: true,
-                  }
-                : m,
-            ),
-          );
-        }
-      }
+            setChatMessages((prev) =>
+              prev.map((m) =>
+                m.id === messageId && m.type === "coach"
+                  ? { ...m, isStreaming: false }
+                  : m,
+              ),
+            );
+          } catch (coachErr: unknown) {
+            const messageId = thinking.id;
+            setChatMessages((prev) =>
+              prev.map((m) =>
+                m.id === messageId && m.type === "coach"
+                  ? {
+                      ...m,
+                      content: `❌ Error: ${coachErr instanceof Error ? coachErr.message : "Failed to get response"}`,
+                      isStreaming: false,
+                      isError: true,
+                    }
+                  : m,
+              ),
+            );
+          }
+        })
+      )
     } catch (e: unknown) {
       setError(
         e instanceof Error ? e.message : "Failed to get responses from coaches",
