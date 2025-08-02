@@ -345,13 +345,12 @@ const AiCoachesApp = () => {
   const [selectedModel, setSelectedModel] = useState(() => {
     try {
       return (
-        localStorage.getItem("ai_coaches_selected_model") ||
-        "google/gemini-2.5-flash-lite-preview-06-17"
-      );
-    } catch {
-      return "google/gemini-2.5-flash-lite-preview-06-17";
-    }
-  });
+      localStorage.getItem("ai_coaches_selected_model") ||
+      "openai/gpt-4.1-mini"
+    );
+  } catch {
+    return "openai/gpt-4.1-mini";
+  }  });
   const [useReasoning, setUseReasoning] = useState(false);
   const [selectedCoaches, setSelectedCoaches] = useState<CoachType[]>(() => {
     try {
@@ -421,19 +420,18 @@ const AiCoachesApp = () => {
   });
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("ai_coaches_selected_model");
-      if (saved && availableModels.some((m) => m.id === saved)) {
-        setSelectedModel(saved);
-        return;
+    // If selectedModel is not in availableModels, set to default
+    if (!availableModels.length) return;
+    if (!availableModels.some((m) => m.id === selectedModel)) {
+      const defaultModel = availableModels.find((m) => m.id === "openai/gpt-4.1-mini")?.id || availableModels[0].id;
+      setSelectedModel(defaultModel);
+      try {
+        localStorage.setItem("ai_coaches_selected_model", defaultModel);
+      } catch (err) {
+        console.error(err);
       }
-    } catch (err) {
-      console.error(err);
     }
-    if (availableModels.length > 0) {
-      setSelectedModel((prev) => prev || availableModels[0].id);
-    }
-  }, []);
+  }, [availableModels, selectedModel]);
 
   const renderApiKeyModal = () => {
     if (!showApiKeyInput) return null;
