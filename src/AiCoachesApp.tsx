@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { marked } from "marked";
 import apiData from "./api.json";
+import Fuse from "fuse.js";
 
 import {
   MessageCircle,
@@ -463,7 +464,7 @@ const AiCoachesApp = () => {
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder="Enter your OpenRouter API key"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4 text-[16px]"
           />
           <div className="flex gap-2">
             <button
@@ -490,13 +491,16 @@ const AiCoachesApp = () => {
   const renderModelSelectorModal = () => {
     if (!showModelSelector) return null;
 
-    const search = modelSearch.trim().toLowerCase();
-    const filteredModels = availableModels.filter(
-      (model) =>
-        model.name?.toLowerCase().includes(search) ||
-        model.id?.toLowerCase().includes(search) ||
-        model.category?.toLowerCase().includes(search),
-    );
+    const search = modelSearch.trim();
+    let filteredModels = availableModels;
+    if (search) {
+      const fuse = new Fuse(availableModels, {
+        keys: ["name", "id", "category"],
+        threshold: 0.4, // fuzzy, but not too loose
+        ignoreLocation: true,
+      });
+      filteredModels = fuse.search(search).map((result) => result.item);
+    }
 
     const groupedModels: Record<string, AvailableModel[]> =
       filteredModels.reduce<Record<string, AvailableModel[]>>((acc, model) => {
@@ -524,7 +528,7 @@ const AiCoachesApp = () => {
               value={modelSearch}
               onChange={(e) => setModelSearch(e.target.value)}
               placeholder="Search models..."
-              className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-2 py-1 text-[16px] border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               autoFocus
             />
           </div>
@@ -897,14 +901,14 @@ const AiCoachesApp = () => {
                 type="text"
                 value={coach.emoji}
                 onChange={(e) => updateCoach(coach.id, "emoji", e.target.value)}
-                className="w-10 h-9 text-center text-lg border border-gray-300 rounded"
+                className="w-10 h-9 text-center text-[16px] border border-gray-300 rounded"
                 maxLength={2}
               />
               <input
                 type="text"
                 value={coach.name}
                 onChange={(e) => updateCoach(coach.id, "name", e.target.value)}
-                className="flex-1 h-9 px-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 h-9 px-2 text-[16px] border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Coach Name"
               />{" "}
               <button
@@ -919,7 +923,7 @@ const AiCoachesApp = () => {
               onChange={(e) =>
                 updateCoach(coach.id, "systemPrompt", e.target.value)
               }
-              className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-20 text-xs resize-none"
+              className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-20 text-[16px] resize-none"
               placeholder="System prompt describing how this coach should behave..."
             />
             <div className="mt-2 flex items-center gap-2">
