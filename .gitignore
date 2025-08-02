@@ -1,0 +1,50 @@
+# Node/Bun dependencies
+node_modules/
+bun.lock
+.bun/
+
+# Build output
+build/
+dist/
+out/
+.next/
+coverage/
+*.tgz
+
+# Environment variables
+.env
+.env.*
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.vscode/
+.idea/
+*.swp
+
+# Misc
+*.lcov
+.eslintcache
+.cache/
+*.tsbuildinfo
+
+# Bun specific
+bunfig.toml.local
+
+# Optional: OS generated files
+Icon?
