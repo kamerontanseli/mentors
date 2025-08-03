@@ -10,7 +10,7 @@
     "start": "NODE_ENV=production bun src/index.tsx",
     "build": "bun run build.ts",
     "lint": "eslint ./src",
-    "typecheck": "tsc ./src/frontend.tsx"
+    "typecheck": "npx tsc --noEmit"
   },
   "dependencies": {
     "bun-plugin-tailwind": "^0.0.14",
