@@ -12,7 +12,6 @@ import {
   User,
   Bot,
    Copy,
-   Check,
    RotateCcw,  ChevronDown,
   Brain,
   X,
@@ -39,7 +38,126 @@ interface MessageType {
   isStreaming?: boolean;
 }
 
+interface ChatHistory {
+  id: string;
+  title: string;
+  messages: MessageType[];
+  createdAt: Date;
+  updatedAt: Date;
+  selectedCoaches: number[];
+  model: string;
+  useReasoning: boolean;
+}
+
 const AiCoachesApp = () => {
+  // --- Tab state ---
+  const [activeTab, setActiveTab] = useState<"chat" | "history" | "settings">("chat");
+  
+  // --- Force save on unload ---
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (chatMessages.length > 0) {
+        console.log("Saving before unload...");
+        saveCurrentChat();
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }); // Empty dependency array - only run once on mount
+  
+  // --- Manual save function for testing ---
+  const manualSave = () => {
+    console.log("Manual save triggered");
+    saveCurrentChat();
+  };
+  
+  // --- Debug logging ---
+  useEffect(() => {
+    console.log("=== COMPONENT MOUNTED ===");
+    console.log("Initial chat history length:", chatHistory.length);
+    console.log("Initial current chat ID:", currentChatId);
+    console.log("Initial chat messages length:", chatMessages.length);
+    
+    // Check localStorage directly
+    try {
+      const rawHistory = localStorage.getItem("ai_coaches_chat_history");
+      const rawCurrentId = localStorage.getItem("ai_coaches_current_chat_id");
+      console.log("Direct localStorage check:");
+      console.log("- Raw history:", rawHistory);
+      console.log("- Raw current ID:", rawCurrentId);
+      
+      // Test localStorage write
+      const testKey = "test_localstorage";
+      localStorage.setItem(testKey, "test_value");
+      const testValue = localStorage.getItem(testKey);
+      console.log("- localStorage test:", testValue === "test_value" ? "PASS" : "FAIL");
+      localStorage.removeItem(testKey);
+    } catch (err) {
+      console.error("Error checking localStorage directly:", err);
+    }
+  }, []);
+  
+  // --- Load chat history from localStorage on mount ---
+  useEffect(() => {
+    const loadChatHistory = () => {
+      try {
+        const saved = localStorage.getItem("ai_coaches_chat_history");
+        console.log("Raw chat history from localStorage:", saved);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          console.log("Parsed chat history:", parsed.length, "chats");
+          const processed = parsed.map((chat: ChatHistory) => ({
+            ...chat,
+            createdAt: new Date(chat.createdAt),
+            updatedAt: new Date(chat.updatedAt),
+            messages: chat.messages.map((msg: MessageType) => ({
+              ...msg,
+              timestamp: new Date(msg.timestamp),
+            })),
+          }));
+          console.log("Processed chat history:", processed.length, "chats");
+          setChatHistory(processed);
+        } else {
+          console.log("No chat history found in localStorage");
+        }
+      } catch (err) {
+        console.error("Error loading chat history:", err);
+        console.error("Error details:", err);
+      }
+    };
+    
+    loadChatHistory();
+  }, []); // Only run once on mount
+  
+  // --- Load current chat ID from localStorage on mount ---
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("ai_coaches_current_chat_id");
+      console.log("Loaded current chat ID from localStorage:", saved);
+      setCurrentChatId(saved);
+    } catch (err) {
+      console.error("Error loading current chat ID:", err);
+    }
+  }, []);
+  
+  
+  
+  // --- Chat history state ---
+  const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]); // Start empty, load with effect
+  const [currentChatId, setCurrentChatId] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem("ai_coaches_current_chat_id");
+      console.log("Loaded current chat ID from localStorage:", saved);
+      return saved;
+    } catch (err) {
+      console.error("Error loading current chat ID:", err);
+    }
+    return null;
+  });
+  
   // --- Missing state/refs for TS errors ---
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -56,6 +174,18 @@ const AiCoachesApp = () => {
   // --- Utility and event handler stubs to fix TS errors ---
   function handleModelChange(modelId: string) {
     setSelectedModel(modelId);
+    
+    // Enable reasoning mode by default if the model supports it
+    const model = availableModels.find((m) => m.id === modelId);
+    if (model && model.supportsReasoning) {
+      setUseReasoning(true);
+      try {
+        localStorage.setItem("ai_coaches_use_reasoning", "true");
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    
     try {
       localStorage.setItem("ai_coaches_selected_model", modelId);
     } catch (err) {
@@ -68,6 +198,11 @@ const AiCoachesApp = () => {
   }
   function handleReasoningChange(enabled: boolean): void {
     setUseReasoning(enabled);
+    try {
+      localStorage.setItem("ai_coaches_use_reasoning", enabled.toString());
+    } catch (err) {
+      console.error(err);
+    }
   }
   async function sendChatMessage() {
     if (!currentMessage.trim() || !apiKey) {
@@ -239,7 +374,7 @@ const AiCoachesApp = () => {
                 m.id === messageId && m.type === "coach"
                   ? { ...m, isStreaming: false }
                   : m,
-              ),
+              )
             );
           } catch (coachErr: unknown) {
             const messageId = thinking.id;
@@ -275,7 +410,6 @@ const AiCoachesApp = () => {
       ]);
     }
   }
-  const [copiedId, setCopiedId] = useState<number | null>(null);
   async function copyToClipboard(text: string, id?: number) {
     await navigator.clipboard.writeText(text);
     if (typeof id === 'number') {
@@ -296,11 +430,144 @@ const AiCoachesApp = () => {
       }
     }
   }
+  function saveCurrentChat(): void {
+    if (chatMessages.length === 0) {
+      console.log("No messages to save");
+      return;
+    }
+    
+    const firstUserMessage = chatMessages.find(m => m.type === "user");
+    const title = firstUserMessage 
+      ? firstUserMessage.content.slice(0, 50) + (firstUserMessage.content.length > 50 ? "..." : "")
+      : "New Chat";
+    
+    const chat: ChatHistory = {
+      id: currentChatId || Date.now().toString(),
+      title,
+      messages: chatMessages,
+      createdAt: currentChatId 
+        ? chatHistory.find(c => c.id === currentChatId)?.createdAt || new Date()
+        : new Date(),
+      updatedAt: new Date(),
+      selectedCoaches: selectedCoaches.map(c => c.id),
+      model: selectedModel,
+      useReasoning,
+    };
+    
+    console.log("Saving chat:", {
+      id: chat.id,
+      title: chat.title,
+      messagesCount: chatMessages.length,
+      selectedCoaches: chat.selectedCoaches,
+      model: chat.model,
+      useReasoning: chat.useReasoning,
+    });
+    
+    // Create updated history
+    let updatedHistory: ChatHistory[];
+    if (currentChatId) {
+      updatedHistory = chatHistory.map(c => c.id === currentChatId ? chat : c);
+    } else {
+      updatedHistory = [...chatHistory, chat];
+    }
+    
+    // Update state
+    setChatHistory(updatedHistory);
+    setCurrentChatId(chat.id);
+    
+    // Save to localStorage immediately
+    try {
+      const serializedHistory = JSON.stringify(updatedHistory);
+      localStorage.setItem("ai_coaches_chat_history", serializedHistory);
+      localStorage.setItem("ai_coaches_current_chat_id", chat.id);
+      
+      // Verify it was saved
+      const verifySaved = localStorage.getItem("ai_coaches_chat_history");
+      const verifyCurrentId = localStorage.getItem("ai_coaches_current_chat_id");
+      
+      console.log("Chat saved successfully to localStorage:");
+      console.log("- Serialized history size:", serializedHistory.length, "characters");
+      console.log("- Verification - saved history length:", verifySaved ? JSON.parse(verifySaved).length : "null");
+      console.log("- Verification - current chat ID:", verifyCurrentId);
+      console.log("- Verification - matches expected:", verifyCurrentId === chat.id);
+      
+    } catch (err) {
+      console.error("Error saving chat to localStorage:", err);
+      console.error("Error details:", err);
+    }
+  }
+
   function newChat(): void {
+    console.log("Creating new chat");
+    if (chatMessages.length > 0) {
+      saveCurrentChat();
+    }
     setChatMessages([]);
     setSelectedCoaches([]);
     setError(null);
     setRetryCount(0);
+    setCurrentChatId(null);
+    try {
+      localStorage.removeItem("ai_coaches_current_chat_id");
+      console.log("Cleared current chat ID");
+    } catch (err) {
+      console.error("Error clearing current chat ID:", err);
+    }
+  }
+
+  function loadChat(chatId: string): void {
+    console.log("Loading chat:", chatId);
+    const chat = chatHistory.find(c => c.id === chatId);
+    if (!chat) {
+      console.error("Chat not found:", chatId);
+      return;
+    }
+    
+    console.log("Found chat, loading", chat.messages.length, "messages");
+    setChatMessages(chat.messages);
+    setSelectedCoaches(coaches.filter(c => chat.selectedCoaches.includes(c.id)));
+    setSelectedModel(chat.model);
+    setUseReasoning(chat.useReasoning);
+    setCurrentChatId(chatId);
+    setError(null);
+    setRetryCount(0);
+    setActiveTab("chat");
+    
+    try {
+      localStorage.setItem("ai_coaches_current_chat_id", chatId);
+      localStorage.setItem("ai_coaches_selected_model", chat.model);
+      localStorage.setItem("ai_coaches_use_reasoning", chat.useReasoning.toString());
+      localStorage.setItem("ai_coaches_selected_coach_ids", JSON.stringify(chat.selectedCoaches));
+      console.log("Chat loaded and preferences saved to localStorage");
+    } catch (err) {
+      console.error("Error saving chat preferences:", err);
+    }
+  }
+
+  function deleteChat(chatId: string): void {
+    console.log("Deleting chat:", chatId);
+    const updatedHistory = chatHistory.filter(c => c.id !== chatId);
+    setChatHistory(updatedHistory);
+    
+    if (currentChatId === chatId) {
+      setCurrentChatId(null);
+      setChatMessages([]);
+      setSelectedCoaches([]);
+      try {
+        localStorage.removeItem("ai_coaches_current_chat_id");
+        localStorage.removeItem("ai_coaches_selected_coach_ids");
+        console.log("Cleared current chat ID and selected coaches");
+      } catch (err) {
+        console.error("Error clearing chat data:", err);
+      }
+    }
+    
+    try {
+      localStorage.setItem("ai_coaches_chat_history", JSON.stringify(updatedHistory));
+      console.log("Chat history updated in localStorage");
+    } catch (err) {
+      console.error("Error saving chat history:", err);
+    }
   }
   const [coaches, setCoaches] = useState<CoachType[]>(() => {
     try {
@@ -334,6 +601,23 @@ const AiCoachesApp = () => {
     ];
   });
   const [chatMessages, setChatMessages] = useState<MessageType[]>([]);
+
+  // --- Auto-save chat when messages change ---
+  useEffect(() => {
+    if (chatMessages.length > 0) {
+      const timeoutId = setTimeout(() => {
+        console.log("Auto-saving chat due to messages change...");
+        saveCurrentChat();
+      }, 500); // Debounce to avoid saving too frequently
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [chatMessages]);
+
+  // Debug: Log when chatHistory changes
+  useEffect(() => {
+    console.log("chatHistory updated:", chatHistory.length, "chats");
+  }, [chatHistory]);
   const [currentMessage, setCurrentMessage] = useState("");
   const [isLoading] = useState(false);
   const [showCoachManager, setShowCoachManager] = useState(false);
@@ -354,7 +638,15 @@ const AiCoachesApp = () => {
   } catch {
     return "openai/gpt-4.1-mini";
   }  });
-  const [useReasoning, setUseReasoning] = useState(false);
+  const [useReasoning, setUseReasoning] = useState(() => {
+    try {
+      const saved = localStorage.getItem("ai_coaches_use_reasoning");
+      if (saved) return saved === "true";
+    } catch (err) {
+      console.error(err);
+    }
+    return false;
+  });
   const [selectedCoaches, setSelectedCoaches] = useState<CoachType[]>(() => {
     try {
       const ids = localStorage.getItem("ai_coaches_selected_coach_ids");
@@ -422,12 +714,42 @@ const AiCoachesApp = () => {
     openrouter: apiData.openrouter,
   });
 
+  // --- Load current chat when history and ID are available
+  useEffect(() => {
+    if (currentChatId && chatHistory.length > 0) {
+      const chat = chatHistory.find(c => c.id === currentChatId);
+      if (chat) {
+        console.log("Loading chat on startup:", chat.id, "with", chat.messages.length, "messages");
+        setChatMessages(chat.messages);
+        setSelectedCoaches(coaches.filter(c => chat.selectedCoaches.includes(c.id)));
+        setSelectedModel(chat.model);
+        setUseReasoning(chat.useReasoning);
+      } else {
+        console.log("Current chat ID not found in history:", currentChatId);
+      }
+    }
+  }, [currentChatId, chatHistory, coaches]);
+
   useEffect(() => {
     // If selectedModel is not in availableModels, set to default
     if (!availableModels.length) return;
     if (!availableModels.some((m) => m.id === selectedModel)) {
       const defaultModel = availableModels.find((m) => m.id === "openai/gpt-4.1-mini")?.id || availableModels[0].id;
+      console.log("Setting default model:", defaultModel);
       setSelectedModel(defaultModel);
+      
+      // Enable reasoning mode by default if the default model supports it
+      const model = availableModels.find((m) => m.id === defaultModel);
+      if (model && model.supportsReasoning) {
+        console.log("Enabling reasoning mode for default model");
+        setUseReasoning(true);
+        try {
+          localStorage.setItem("ai_coaches_use_reasoning", "true");
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      
       try {
         localStorage.setItem("ai_coaches_selected_model", defaultModel);
       } catch (err) {
@@ -435,6 +757,13 @@ const AiCoachesApp = () => {
       }
     }
   }, [availableModels, selectedModel]);
+
+  useEffect(() => {
+    // Debug logging for available models
+    console.log("Available models:", availableModels.length);
+    console.log("Selected model:", selectedModel);
+    console.log("Use reasoning:", useReasoning);
+  }, [availableModels, selectedModel, useReasoning]);
 
   const renderApiKeyModal = () => {
     if (!showApiKeyInput) return null;
@@ -1008,6 +1337,46 @@ Output only the prompt, no preface.`;
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
+      {/* Tabbed Navbar */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="flex">
+          <button
+            onClick={() => setActiveTab("chat")}
+            className={`flex-1 px-4 py-3 text-sm font-medium text-center border-b-2 transition-colors ${
+              activeTab === "chat"
+                ? "border-blue-500 text-blue-600 bg-blue-50"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            <MessageCircle size={16} className="mx-auto mb-1" />
+            Chat
+          </button>
+          <button
+            onClick={() => setActiveTab("history")}
+            className={`flex-1 px-4 py-3 text-sm font-medium text-center border-b-2 transition-colors ${
+              activeTab === "history"
+                ? "border-blue-500 text-blue-600 bg-blue-50"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            <RotateCcw size={16} className="mx-auto mb-1" />
+            History
+          </button>
+          <button
+            onClick={() => setActiveTab("settings")}
+            className={`flex-1 px-4 py-3 text-sm font-medium text-center border-b-2 transition-colors ${
+              activeTab === "settings"
+                ? "border-blue-500 text-blue-600 bg-blue-50"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            <Settings size={16} className="mx-auto mb-1" />
+            Settings
+          </button>
+        </div>
+      </div>
+
+      {/* Status Bar */}
       <div className="bg-white border-b border-gray-200 px-3 py-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -1021,21 +1390,221 @@ Output only the prompt, no preface.`;
                 ✓ API Connected
               </div>
             )}
-            <button
-              onClick={() => setShowCoachManager(!showCoachManager)}
-              className="p-1.5 text-gray-600 hover:bg-gray-100 rounded"
-            >
-              <Settings size={16} />
-            </button>
           </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-hidden">
-        {showCoachManager ? renderCoachManager() : renderChat()}
+        {activeTab === "chat" && (showCoachManager ? renderCoachManager() : renderChat())}
+        {activeTab === "history" && (
+          <div className="p-6 h-full overflow-y-auto">
+            <div className="max-w-4xl mx-auto">
+              <h2 className="text-xl font-semibold mb-6">Chat History</h2>
+              
+              {chatHistory.length === 0 ? (
+                <div className="text-center text-gray-500 mt-8">
+                  <RotateCcw className="mx-auto mb-4" size={48} />
+                  <p className="text-xl font-semibold mb-2">No Chat History</p>
+                  <p className="text-gray-600 mb-4">
+                    Your conversations will appear here
+                  </p>
+                  <button
+                    onClick={() => setActiveTab("chat")}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                  >
+                    Start Chatting
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {chatHistory
+                    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+                    .map((chat) => (
+                      <div
+                        key={chat.id}
+                        className={`bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer ${
+                          currentChatId === chat.id ? "border-blue-300 bg-blue-50" : ""
+                        }`}
+                        onClick={() => loadChat(chat.id)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-gray-900 mb-1 truncate">
+                              {chat.title}
+                            </h3>
+                            <div className="flex items-center gap-4 text-xs text-gray-500 mb-2">
+                              <span>{chat.messages.length} messages</span>
+                              <span>•</span>
+                              <span>{chat.selectedCoaches.length} coaches</span>
+                              <span>•</span>
+                              <span>{availableModels.find(m => m.id === chat.model)?.name || "Unknown"}</span>
+                              {chat.useReasoning && (
+                                <>
+                                  <span>•</span>
+                                  <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                                    Reasoning
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              Updated {chat.updatedAt.toLocaleDateString()} {chat.updatedAt.toLocaleTimeString()}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 ml-4">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                loadChat(chat.id);
+                              }}
+                              className="p-1.5 text-blue-600 hover:bg-blue-100 rounded"
+                              title="Continue chat"
+                            >
+                              <MessageCircle size={14} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteChat(chat.id);
+                              }}
+                              className="p-1.5 text-red-600 hover:bg-red-100 rounded"
+                              title="Delete chat"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+              
+              {chatHistory.length > 0 && (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <button
+                    onClick={() => {
+                      if (confirm("Are you sure you want to delete all chat history? This action cannot be undone.")) {
+                        setChatHistory([]);
+                        setCurrentChatId(null);
+                        setChatMessages([]);
+                        setSelectedCoaches([]);
+                        setError(null);
+                        setRetryCount(0);
+                        try {
+                          localStorage.removeItem("ai_coaches_chat_history");
+                          localStorage.removeItem("ai_coaches_current_chat_id");
+                          localStorage.removeItem("ai_coaches_selected_coach_ids");
+                          console.log("All chat history cleared");
+                        } catch (err) {
+                          console.error("Error clearing chat history:", err);
+                        }
+                      }
+                    }}
+                    className="w-full px-4 py-2 text-sm text-red-600 border border-red-300 rounded hover:bg-red-50"
+                  >
+                    🗑️ Clear All Chats
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {activeTab === "settings" && (
+          <div className="p-6 h-full overflow-y-auto">
+            <div className="max-w-2xl mx-auto">
+              <h2 className="text-xl font-semibold mb-6">Settings</h2>
+              
+              <div className="space-y-6">
+                {/* API Key Section */}
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h3 className="font-medium mb-3">API Configuration</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">OpenRouter API Key</span>
+                      <button
+                        onClick={() => setShowApiKeyInput(true)}
+                        className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                      >
+                        {apiKey ? "Update Key" : "Set Key"}
+                      </button>
+                    </div>
+                    {apiKey && (
+                      <div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                        ✓ API key is configured
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Model Settings */}
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h3 className="font-medium mb-3">Model Settings</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Current Model</span>
+                      <button
+                        onClick={() => setShowModelSelector(true)}
+                        className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                      >
+                        {getCurrentModel()?.name || "Unknown"}
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Reasoning Mode</span>
+                      <label className="inline-flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={useReasoning && getCurrentModel()?.supportsReasoning}
+                          onChange={(e) => handleReasoningChange(e.target.checked)}
+                          className="rounded mr-2"
+                          disabled={!getCurrentModel()?.supportsReasoning}
+                        />
+                        <span className="text-sm">
+                          {getCurrentModel()?.supportsReasoning ? "Enabled" : "Not supported"}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Coach Management */}
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h3 className="font-medium mb-3">Coach Management</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Number of Coaches</span>
+                      <span className="text-sm font-medium">{coaches.length}</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setActiveTab("chat");
+                        setShowCoachManager(true);
+                      }}
+                      className="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                      Manage Coaches
+                    </button>
+                  </div>
+                </div>
+
+                {/* App Info */}
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h3 className="font-medium mb-3">About</h3>
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <div>AI Coaches App</div>
+                    <div>Get advice from expert AI coaches</div>
+                    <div className="text-xs text-gray-500 mt-2">
+                      Powered by OpenRouter API
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {!showCoachManager && (
+      {activeTab === "chat" && !showCoachManager && (
         <div className="bg-white border-t border-gray-200 px-3 py-1.5">
           <div className="flex gap-2 overflow-x-auto no-scrollbar whitespace-nowrap">
             {coaches.map((coach) => (
