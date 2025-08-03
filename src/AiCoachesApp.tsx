@@ -68,12 +68,6 @@ const AiCoachesApp = () => {
     };
   }); // Empty dependency array - only run once on mount
   
-  // --- Manual save function for testing ---
-  const manualSave = () => {
-    console.log("Manual save triggered");
-    saveCurrentChat();
-  };
-  
   // --- Debug logging ---
   useEffect(() => {
     console.log("=== COMPONENT MOUNTED ===");
@@ -410,14 +404,8 @@ const AiCoachesApp = () => {
       ]);
     }
   }
-  async function copyToClipboard(text: string, id?: number) {
+  async function copyToClipboard(text: string) {
     await navigator.clipboard.writeText(text);
-    if (typeof id === 'number') {
-      setCopiedId(id);
-      setTimeout(() => {
-        setCopiedId((curr) => (curr === id ? null : curr));
-      }, 1000);
-    }
   }
   function retryLastRequest(): void {
     setRetryCount((p) => p + 1);
@@ -623,9 +611,11 @@ const AiCoachesApp = () => {
   const [showCoachManager, setShowCoachManager] = useState(false);
   const [apiKey, setApiKey] = useState<string>(() => {
     try {
-      return localStorage.getItem("openrouter_api_key") || "";
+      const saved = localStorage.getItem("openrouter_api_key");
+      return saved || "";
     } catch (err) {
       console.error(err);
+      return "";
     }
   });
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
