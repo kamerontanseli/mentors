@@ -154,7 +154,9 @@ const AiCoachesApp = () => {
             } = {
               model: selectedModel,
               messages: baseMessages,
-              max_tokens: useReasoning ? 800 : 300,
+              max_tokens: useReasoning 
+                ? (currentModel?.nativeReasoning ? 4000 : 2000) 
+                : 500,
               temperature: 0.7,
               stream: true,
             };
