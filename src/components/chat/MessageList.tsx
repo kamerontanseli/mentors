@@ -10,9 +10,19 @@ interface MessageListProps {
 
 export function MessageList({ messages, onCopyMessage }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = scrollContainerRef.current;
+    if (container) {
+      // Only scroll if user is close to the bottom
+      const threshold = 150; // pixels
+      const isScrolledToBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + threshold;
+      
+      if (isScrolledToBottom) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }
+    }
   }, [messages]);
 
   const handleCopy = async (content: string, buttonElement: HTMLButtonElement) => {
@@ -31,7 +41,7 @@ export function MessageList({ messages, onCopyMessage }: MessageListProps) {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-3 space-y-3">
+    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-3 space-y-3">
       {messages.map((message) => (
         <div
           key={message.id}
