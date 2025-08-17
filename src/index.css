@@ -1,69 +1,81 @@
 @import "tailwindcss";
+@import "./theme.css";
 
-.markdown h1 {
-  font-size: 0.875rem;
-  font-weight: 700;
-  margin: 0.75rem 0;
-}
-
-.markdown h2 {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  margin: 0.75rem 0;
-}
-
-.markdown h3 {
-  font-size: 0.75rem;
-  font-weight: 600;
-  margin: 0.75rem 0;
+/* Markdown styling for chat messages */
+.markdown {
+    line-height: 1.5;
 }
 
 .markdown p {
-  margin: 0.75rem 0;
+    margin: 0.25rem 0;
 }
 
-.markdown ul, .markdown ol {
-  margin: 0.75rem 0;
-  padding-left: 1rem;
+.markdown ul,
+.markdown ol {
+    margin: 0.25rem 0 0.25rem 1rem;
+    padding-left: 1rem;
+    list-style-position: outside;
+}
+
+.markdown ul {
+    list-style-type: disc;
+}
+
+.markdown ol {
+    list-style-type: decimal;
 }
 
 .markdown li {
-  margin: 0.75rem 0;
+    margin: 0.125rem 0;
 }
 
-.markdown strong {
-  font-weight: 600;
-}
-
-.markdown em {
-  font-style: italic;
+.markdown a {
+    color: #60a5fa; /* Tailwind blue-400 */
+    text-decoration: underline;
 }
 
 .markdown code {
-  background-color: rgba(0, 0, 0, 0.05);
-  padding: 0.125rem 0.25rem;
-  border-radius: 0.25rem;
-  font-size: 0.6875rem;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    background-color: #2d2d2d;
+    color: #f8f8f2;
+    padding: 0.1rem 0.2rem;
+    border-radius: 0.25rem;
 }
 
 .markdown pre {
-  background-color: rgba(0, 0, 0, 0.05);
-  padding: 0.5rem;
-  border-radius: 0.25rem;
-  margin: 0.75rem 0;
-  overflow-x: auto;
+    background-color: #1e1e1e;
+    color: #f8f8f2;
+    padding: 0.5rem;
+    overflow-x: auto;
+    border-radius: 0.25rem;
 }
 
-.markdown pre code {
-  background-color: transparent;
-  padding: 0;
-  font-size: 0.6875rem;
+/* Heading styling */
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+    margin: 0.5rem 0;
 }
 
-.markdown blockquote {
-  border-left: 2px solid #e5e7eb;
-  padding-left: 0.75rem;
-  margin: 0.75rem 0;
-  color: #6b7280;
+/* Table styling */
+.markdown table {
+    margin: 0.5rem 0;
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 600px;
+    display: block;
+    overflow-x: auto;
+}
+
+.markdown th,
+.markdown td {
+    border: 1px solid #555;
+    padding: 0.25rem 0.5rem;
+}
+
+.markdown th {
+    background-color: #2d2d2d;
+    color: #f8f8f2;
 }
