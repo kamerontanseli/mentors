@@ -104,7 +104,7 @@
     border-radius: var(--border-radius-md);
     padding: var(--space-2);
     font-family: var(--font-family-base);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
 }
 
 .send-btn {
@@ -137,7 +137,7 @@
     border-radius: var(--border-radius-md);
     margin-bottom: var(--space-1);
     font-family: var(--font-family-base);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     line-height: 1.5;
 }
 .bubble.ai {
@@ -163,6 +163,11 @@
 /* Accessibility */
 [role="button"] {
     cursor: pointer;
+}
+
+/* Ensure all input elements have 16px font size */
+input {
+    font-size: 16px;
 }
 
 /* Markdown overrides (keep existing) */
