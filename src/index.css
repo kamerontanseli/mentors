@@ -80,6 +80,11 @@
 
 /* Core component classes */
 .header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
     height: 48px;
     display: flex;
     align-items: center;
@@ -90,6 +95,11 @@
 }
 
 .input-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
     height: 56px;
     display: flex;
     gap: 16px;
@@ -190,7 +200,7 @@ input {
 
 .markdown ul,
 .markdown ol {
-    margin: 0.25rem 0 0.25rem 1rem;
+    margin: 0.25rem 0;
     padding-left: 1rem;
     list-style-position: outside;
 }
