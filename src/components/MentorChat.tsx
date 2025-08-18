@@ -1,9 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Groq } from "groq-sdk";
-import { Send, Copy, RefreshCw, Check } from "lucide-react";
+import {
+  Send,
+  Copy,
+  RefreshCw,
+  Check,
+  HandFist,
+  Shield,
+  FlaskConical,
+  Scroll,
+  UserRound,
+} from "lucide-react";
 import { marked } from "marked";
 
-import { Mentor } from "./MentorList";
+import { Mentor, mentorColors } from "./MentorList";
 
 interface Message {
   role: "user" | "assistant";
@@ -74,7 +84,7 @@ export const MentorChat: React.FC<MentorChatProps> = ({ mentors, apiKey }) => {
     tables.forEach((table) => {
       if (table.parentElement?.classList.contains("overflow-x-auto")) return;
       const wrapper = document.createElement("div");
-      wrapper.className = "overflow-x-auto";
+      wrapper.className = "overflow-x-auto max-w-[300px]";
       table.parentNode?.insertBefore(wrapper, table);
       wrapper.appendChild(table);
     });
@@ -205,7 +215,7 @@ export const MentorChat: React.FC<MentorChatProps> = ({ mentors, apiKey }) => {
       </header>
 
       {/* Message list */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 pt-16 pb-20">
         {messages.map((msg, idx) => {
           const isUser = msg.role === "user";
           const containerClass = isUser
@@ -213,22 +223,40 @@ export const MentorChat: React.FC<MentorChatProps> = ({ mentors, apiKey }) => {
             : "flex justify-start";
           const avatar =
             !isUser && msg.mentor ? (
-              <div className="avatar mr-2">{msg.mentor.emoji}</div>
+<div className="avatar mr-2 flex-shrink-0">
+                  {(() => {
+                    const colorClass = mentorColors[msg.mentor?.name || ""] || "";
+                    switch (msg.mentor?.name) {
+                      case "David Goggins":
+                        return <HandFist className={`w-6 h-6 ${colorClass}`} />;
+                      case "Jocko Willink":
+                        return <Shield className={`w-6 h-6 ${colorClass}`} />;
+                      case "Tim Ferriss":
+                        return <FlaskConical className={`w-6 h-6 ${colorClass}`} />;
+                      case "Marcus Aurelius":
+                        return <Scroll className={`w-6 h-6 ${colorClass}`} />;
+                      default:
+                        return null;
+                    }
+                  })()}
+                </div>
             ) : null;
           return (
             <div key={idx} className={containerClass}>
               {!isUser && avatar}
-              <div className="max-w-xs">
-                <div className={`bubble ${isUser ? "user" : "ai"} markdown`}>
+              <div className="max-w-full w-full">
+                <div
+                  className={`bubble w-fit ${isUser ? "user" : "ai"} markdown`}
+                >
                   {isUser ? (
-                    <div>{msg.content}</div>
+                    <div className="break-words text-xs">{msg.content}</div>
                   ) : (
                     <>
-                      <div className="text-xs font-medium mb-1">
-                        {msg.mentor?.name}
-                      </div>
+<div className={`text-xs font-semibold mb-1 ${mentorColors[msg.mentor?.name || ""] || "text-white"}`}>
+                          {msg.mentor?.name}
+                        </div>
                       <div
-                        className="break-words"
+                        className="break-words text-xs"
                         dangerouslySetInnerHTML={{
                           __html: marked(msg.content),
                         }}
@@ -236,7 +264,9 @@ export const MentorChat: React.FC<MentorChatProps> = ({ mentors, apiKey }) => {
                     </>
                   )}
                 </div>
-                <div className="flex items-center text-xs text-secondary mt-2 space-x-2">
+                <div
+                  className={`flex items-center text-xs text-secondary mt-2 space-x-2 ${isUser ? "justify-end" : ""}`}
+                >
                   <span className="text-sm">
                     {msg.timestamp.toLocaleTimeString([], {
                       hour: "numeric",
@@ -272,11 +302,12 @@ export const MentorChat: React.FC<MentorChatProps> = ({ mentors, apiKey }) => {
           );
         })}
         {loading && (
-          <div className="flex justify-start mb-2">
-            <div className="max-w-xs">
-              <div className="bubble ai markdown">
-                <span className="animate-pulse">Typing...</span>
-              </div>
+          <div className="flex justify-start items-center mb-2">
+            <div className="avatar mr-2 flex-shrink-0">
+              <UserRound className="w-6 h-6 mr-2" />
+            </div>
+            <div className="">
+              <span className="text-xs">Typing...</span>
             </div>
           </div>
         )}
